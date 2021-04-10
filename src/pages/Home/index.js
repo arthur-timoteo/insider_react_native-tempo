@@ -1,110 +1,85 @@
-import React from 'react';
-import { SafeAreaView, StyleSheet, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, StyleSheet, FlatList, View, Text } from 'react-native';
+import * as Location from 'expo-location';
 
 import Menu from '../../components/Menu';
 import Header from '../../components/Header';
 import Conditions from '../../components/Conditions';
 import Forecast from '../../components/Forecast';
 
-const mylist = [
-    {
-      "date": "08/04",
-      "weekday": "Qui",
-      "max": 23,
-      "min": 15,
-      "description": "Ensolarado",
-      "condition": "clear_day"
-    },
-    {
-      "date": "09/04",
-      "weekday": "Sex",
-      "max": 26,
-      "min": 13,
-      "description": "Ensolarado",
-      "condition": "clear_day"
-    },
-    {
-      "date": "10/04",
-      "weekday": "Sáb",
-      "max": 26,
-      "min": 15,
-      "description": "Ensolarado",
-      "condition": "clear_day"
-    },
-    {
-      "date": "11/04",
-      "weekday": "Dom",
-      "max": 27,
-      "min": 15,
-      "description": "Ensolarado",
-      "condition": "clear_day"
-    },
-    {
-      "date": "12/04",
-      "weekday": "Seg",
-      "max": 23,
-      "min": 17,
-      "description": "Trovoadas dispersas",
-      "condition": "storm"
-    },
-    {
-      "date": "13/04",
-      "weekday": "Ter",
-      "max": 21,
-      "min": 16,
-      "description": "Tempo nublado",
-      "condition": "cloud"
-    },
-    {
-      "date": "14/04",
-      "weekday": "Qua",
-      "max": 21,
-      "min": 15,
-      "description": "Tempo nublado",
-      "condition": "cloud"
-    },
-    {
-      "date": "15/04",
-      "weekday": "Qui",
-      "max": 22,
-      "min": 14,
-      "description": "Parcialmente nublado",
-      "condition": "cloudly_day"
-    },
-    {
-      "date": "16/04",
-      "weekday": "Sex",
-      "max": 22,
-      "min": 13,
-      "description": "Parcialmente nublado",
-      "condition": "cloudly_day"
-    },
-    {
-      "date": "17/04",
-      "weekday": "Sáb",
-      "max": 20,
-      "min": 13,
-      "description": "Trovoadas dispersas",
-      "condition": "storm"
-    }
-  ];
+import api, {key} from '../../services/api';
 
 export default function Home(){
+  const [errorMsg,setErrorMgs] = useState(null);
+  const [loading,setLoading] = useState(true);
+  const [weather,setWeather] = useState([]);
+  const [icon,setIcon] = useState({name: 'cloud', color: '#fff'});
+  const [background, setBackground] = useState(['#1ed6ff', '#97c1ff']);
+  
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestPermissionsAsync();
+      
+      if(status !== 'granted'){
+        setErrorMgs('Permissão negada para acessar a localização');
+        setLoading(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+
+      const response = await api.get(`/weather?key=${key}&lat=${location.coords.latitude}&lon=${location.coords.longitude}`);
+
+      setWeather(response.data);
+
+      if(response.data.results.currently === 'noite'){
+        setBackground(['#0c3741', '#0f2f61']);
+      }
+
+      switch(response.data.results.condition_slug){
+        case 'clear_day':
+          setIcon({name: 'partly-sunny', color: '#ffb300'});
+          break;
+        case 'rain':
+          setIcon({name: 'rainy', color: '#fff'});
+          break;
+        case 'storm':
+          setIcon({name: 'rainy', color: '#fff'});
+          break;
+      }
+
+      setLoading(false);
+
+    })();
+  }, []);
+
+  if(loading){
     return(
-        <SafeAreaView style={styles.container}>
-            <Menu/>
-            <Header/>
-            <Conditions/>
-            <FlatList
-                horizontal={true}
-                contentContainerStyle={{paddingBottom: '5%'}}
-                style={styles.list}
-                data={mylist}
-                keyExtractor={item => item.date}
-                renderItem={({item}) => <Forecast data={item} />}
-            />
-        </SafeAreaView>
+      <View style={styles.container}>
+        <Text style={{ fontSize: 17, fontStyle: 'italic' }}>Carregando dados...</Text>
+      </View>
     );
+  }
+
+  return(
+      <SafeAreaView style={styles.container}>
+          <Menu/>
+          
+          <Header background={background} weather={weather} icon={icon} />
+
+          <Conditions weather={weather} />
+
+          <FlatList
+              showsHorizontalScrollIndicator={false}
+              horizontal={true}
+              contentContainerStyle={{paddingBottom: '5%'}}
+              style={styles.list}
+              data={weather.results.forecast}
+              keyExtractor={item => item.date}
+              renderItem={({item}) => <Forecast data={item} />}
+          />
+      </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
